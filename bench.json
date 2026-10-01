@@ -1,0 +1,24 @@
+{
+  "n": {
+    "params_m": 2.59,
+    "map50": 0.995,
+    "map50_95": 0.9788,
+    "precision": 0.9975,
+    "recall": 1.0,
+    "latency_ms_mps_p50": 15.0,
+    "latency_ms_mps_p95": 16.7,
+    "latency_ms_cpu_p50": 34.4,
+    "latency_ms_cpu_p95": 35.2
+  },
+  "s": {
+    "params_m": 9.43,
+    "map50": 0.995,
+    "map50_95": 0.9767,
+    "precision": 0.9981,
+    "recall": 1.0,
+    "latency_ms_mps_p50": 19.6,
+    "latency_ms_mps_p95": 21.1,
+    "latency_ms_cpu_p50": 57.1,
+    "latency_ms_cpu_p95": 58.6
+  }
+}
