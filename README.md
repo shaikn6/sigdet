@@ -48,6 +48,8 @@ python bench.py && python robustness.py n s            # regenerate bench.json /
 python -m pytest tests
 ```
 
+CI runs lint and a compile check only: the tests need the dataset and the trained weights.
+
 ## License
 
 AGPL-3.0. The dataset and the `ultralytics` library are AGPL-3.0, and this repo is licensed to match.
