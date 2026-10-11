@@ -1,4 +1,4 @@
-ultralytics>=8.4
+ultralytics>=8.4.174
 opencv-python
 numpy
 pytest
