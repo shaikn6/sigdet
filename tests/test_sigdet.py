@@ -1,6 +1,6 @@
 import glob, pathlib
 import pytest
-from detect import detect
+from detect import WEIGHTS, detect
 
 VAL = sorted(glob.glob(str(pathlib.Path.home() / "datasets/signature/images/val/*")))
 LABELS = pathlib.Path.home() / "datasets/signature/labels/val"
@@ -31,3 +31,17 @@ def test_confidence_threshold_is_respected():
         pytest.skip("dataset missing")
     boxes, _ = detect(VAL[0], conf=0.9)
     assert all(b["conf"] >= 0.9 for b in boxes)
+
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+
+def test_smoke_detects_signature_on_committed_sample():
+    # Needs only committed files (sample.jpg + the n weights), so it also runs on CI.
+    boxes, _ = detect(str(ROOT / "sample.jpg"), weights=WEIGHTS)
+    assert boxes and all(b["conf"] > 0 for b in boxes)
+
+
+def test_missing_image_raises_clear_error():
+    with pytest.raises(FileNotFoundError, match="input image not found"):
+        detect(str(ROOT / "does_not_exist.jpg"))
