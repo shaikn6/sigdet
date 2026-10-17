@@ -1,5 +1,6 @@
 """Detect signatures in document images: python detect.py scan.jpg [--out annotated.jpg] [--conf 0.25]"""
 import argparse
+import functools
 import json
 import pathlib
 
@@ -8,8 +9,15 @@ from ultralytics import YOLO
 WEIGHTS = str(pathlib.Path(__file__).resolve().parent / "weights" / "signature_yolo11n.pt")
 
 
+@functools.lru_cache(maxsize=2)
+def _model(weights):
+    return YOLO(weights)
+
+
 def detect(path, conf=0.25, weights=WEIGHTS):
-    r = YOLO(weights).predict(path, conf=conf, verbose=False)[0]
+    if not pathlib.Path(path).is_file():
+        raise FileNotFoundError(f"input image not found: {path}")
+    r = _model(str(weights)).predict(path, conf=conf, verbose=False)[0]
     boxes = [dict(xyxy=[round(v, 1) for v in b.xyxy[0].tolist()], conf=round(float(b.conf), 3)) for b in r.boxes]
     return boxes, r
 
