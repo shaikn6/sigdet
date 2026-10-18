@@ -1,4 +1,4 @@
-"""Held-out accuracy plus per-image latency (MPS and CPU) for each trained model."""
+"""Val and test accuracy plus per-image latency (MPS and CPU) for each trained model. Test is never used to pick a checkpoint."""
 import json
 import pathlib
 import time
@@ -6,15 +6,17 @@ import numpy as np
 from ultralytics import YOLO
 
 RUNS = pathlib.Path(__file__).resolve().parent / "runs"
+SPLIT = pathlib.Path.home() / "datasets/signature_split"  # built by make_split.py
 
-imgs = sorted(str(p) for p in (pathlib.Path.home() / "datasets/signature/images/val").glob("*"))
+imgs = sorted(str(p) for p in (SPLIT / "images/test").glob("*"))
 out = {}
 for size in ["n", "s"]:
     model = YOLO(str(RUNS / size / "weights" / "best.pt"))
-    m = model.val(data="signature.yaml", device="mps", verbose=False, plots=False)
-    row = dict(params_m=round(sum(p.numel() for p in model.model.parameters()) / 1e6, 2),
-               map50=round(float(m.box.map50), 4), map50_95=round(float(m.box.map), 4),
-               precision=round(float(m.box.mp), 4), recall=round(float(m.box.mr), 4))
+    row = dict(params_m=round(sum(p.numel() for p in model.model.parameters()) / 1e6, 2))
+    for split in ["val", "test"]:
+        m = model.val(data=str(SPLIT / "signature_split.yaml"), split=split, device="mps", verbose=False, plots=False)
+        row[split] = dict(map50=round(float(m.box.map50), 4), map50_95=round(float(m.box.map), 4),
+                          precision=round(float(m.box.mp), 4), recall=round(float(m.box.mr), 4))
     for dev in ["mps", "cpu"]:
         model.predict(imgs[0], device=dev, verbose=False)
         ts = []

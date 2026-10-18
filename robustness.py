@@ -1,11 +1,11 @@
-"""Measure how detector mAP degrades under realistic scan/photo corruptions of the held-out val images."""
+"""Measure how detector mAP degrades under realistic scan/photo corruptions of the held-out TEST images."""
 import json, shutil, sys, tempfile, pathlib
 import cv2, numpy as np
 from ultralytics import YOLO
 
 RUNS = pathlib.Path(__file__).resolve().parent / "runs"
 
-SRC = pathlib.Path.home() / "datasets/signature"
+SRC = pathlib.Path.home() / "datasets/signature_split"
 rng = np.random.default_rng(0)
 
 
@@ -28,11 +28,11 @@ CORRUPTIONS = {
 
 
 def build(tmp, fn):
-    (tmp / "images/val").mkdir(parents=True); (tmp / "labels/val").mkdir(parents=True)
-    for p in sorted((SRC / "images/val").iterdir()):
-        cv2.imwrite(str(tmp / "images/val" / p.name), fn(cv2.imread(str(p))))
-        shutil.copy(SRC / "labels/val" / (p.stem + ".txt"), tmp / "labels/val")
-    (tmp / "d.yaml").write_text(f"path: {tmp}\ntrain: images/val\nval: images/val\nnames:\n  0: signature\n")
+    (tmp / "images/test").mkdir(parents=True); (tmp / "labels/test").mkdir(parents=True)
+    for p in sorted((SRC / "images/test").iterdir()):
+        cv2.imwrite(str(tmp / "images/test" / p.name), fn(cv2.imread(str(p))))
+        shutil.copy(SRC / "labels/test" / (p.stem + ".txt"), tmp / "labels/test")
+    (tmp / "d.yaml").write_text(f"path: {tmp}\ntrain: images/test\nval: images/test\nnames:\n  0: signature\n")
     return tmp / "d.yaml"
 
 
