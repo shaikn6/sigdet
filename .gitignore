@@ -4,3 +4,5 @@ __pycache__/
 runs/
 *.log
 yolo11*.pt
+
+HANDOFF.md
