@@ -38,8 +38,24 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 def test_smoke_detects_signature_on_committed_sample():
     # Needs only committed files (sample.jpg + the n weights), so it also runs on CI.
-    boxes, _ = detect(str(ROOT / "sample.jpg"), weights=WEIGHTS)
-    assert boxes and all(b["conf"] > 0 for b in boxes)
+    boxes, r = detect(str(ROOT / "sample.jpg"), weights=WEIGHTS)
+    h, w = r.orig_shape
+    assert boxes and all(0 < b["conf"] <= 1 for b in boxes)
+    # Boxes must be well-formed and inside the image, not just present.
+    for b in boxes:
+        x1, y1, x2, y2 = b["xyxy"]
+        assert 0 <= x1 < x2 <= w and 0 <= y1 < y2 <= h
+
+
+def test_confidence_threshold_is_respected_on_committed_sample():
+    # Same contract as the dataset-backed test above, but runnable on CI.
+    sample = str(ROOT / "sample.jpg")
+    default, _ = detect(sample)
+    strict, _ = detect(sample, conf=0.9)
+    assert default and all(b["conf"] >= 0.25 for b in default)
+    assert all(b["conf"] >= 0.9 for b in strict)
+    assert len(strict) <= len(default)
+    assert detect(sample, conf=1.0)[0] == []
 
 
 def test_missing_image_raises_clear_error():
