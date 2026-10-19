@@ -69,8 +69,8 @@ python -m pytest tests
 ```
 
 CI runs lint, a compile check, and the tests. Two tests need the dataset under `~/datasets/signature` and are
-skipped on CI; the smoke test (`detect()` on the committed `sample.jpg` with the committed `n` weights) and the
-missing-file test run everywhere.
+skipped on CI; the smoke tests (`detect()` on the committed `sample.jpg` with the committed `n` weights: box
+structure and confidence-threshold checks) and the missing-file test run everywhere.
 
 ## License
 
