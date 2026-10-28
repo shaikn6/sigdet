@@ -1,9 +1,11 @@
-"""Measure how detector mAP degrades under realistic scan/photo corruptions of the held-out TEST images."""
-import json, shutil, sys, tempfile, pathlib
+"""Measure how detector mAP degrades under realistic scan/photo corruptions of the held-out TEST images.
+
+    python robustness.py n s [--device auto|cpu|mps|cuda:0]
+"""
+import argparse, json, shutil, tempfile, pathlib
 import cv2, numpy as np
 from ultralytics import YOLO
-
-RUNS = pathlib.Path(__file__).resolve().parent / "runs"
+from device import pick_device, weights_for
 
 SRC = pathlib.Path.home() / "datasets/signature_split"
 rng = np.random.default_rng(0)
@@ -36,13 +38,19 @@ def build(tmp, fn):
     return tmp / "d.yaml"
 
 
+ap = argparse.ArgumentParser()
+ap.add_argument("sizes", nargs="+", choices=["n", "s"])
+ap.add_argument("--device", default="auto")
+a = ap.parse_args()
+device = pick_device(a.device)
+
 out = {}
-for size in sys.argv[1:]:
-    model = YOLO(str(RUNS / size / "weights" / "best.pt"))
+for size in a.sizes:
+    model = YOLO(str(weights_for(size)))
     out[size] = {}
     for name, fn in CORRUPTIONS.items():
         with tempfile.TemporaryDirectory() as t:
-            m = model.val(data=str(build(pathlib.Path(t), fn)), device="mps", verbose=False, plots=False)
+            m = model.val(data=str(build(pathlib.Path(t), fn)), device=device, verbose=False, plots=False)
         out[size][name] = dict(map50=round(float(m.box.map50), 4), map50_95=round(float(m.box.map), 4))
         print(size, name, out[size][name], flush=True)
 json.dump(out, open("robustness.json", "w"), indent=2)

@@ -1,24 +1,64 @@
 {
+  "cpu": "Apple M2 Pro",
+  "device": "mps",
   "n": {
-    "params_m": 2.59,
-    "map50": 0.995,
-    "map50_95": 0.9788,
-    "precision": 0.9975,
-    "recall": 1.0,
-    "latency_ms_mps_p50": 15.0,
-    "latency_ms_mps_p95": 16.7,
-    "latency_ms_cpu_p50": 34.4,
-    "latency_ms_cpu_p95": 35.2
+    "weights": "weights/signature_yolo11n.pt",
+    "params_m": 2.6,
+    "val": {
+      "map50": 0.9939,
+      "map50_95": 0.9756,
+      "precision": 0.9638,
+      "recall": 0.9615,
+      "images": 26,
+      "map50_95_ci95": [
+        0.9517,
+        0.992
+      ]
+    },
+    "test": {
+      "map50": 0.995,
+      "map50_95": 0.9339,
+      "precision": 0.998,
+      "recall": 1.0,
+      "images": 26,
+      "map50_95_ci95": [
+        0.9019,
+        0.965
+      ]
+    },
+    "latency_ms_mps_p50": 15.3,
+    "latency_ms_mps_p95": 16.9,
+    "latency_ms_cpu_p50": 35.2,
+    "latency_ms_cpu_p95": 39.4
   },
   "s": {
+    "weights": "weights/signature_yolo11s.pt",
     "params_m": 9.43,
-    "map50": 0.995,
-    "map50_95": 0.9767,
-    "precision": 0.9981,
-    "recall": 1.0,
-    "latency_ms_mps_p50": 19.6,
-    "latency_ms_mps_p95": 21.1,
-    "latency_ms_cpu_p50": 57.1,
-    "latency_ms_cpu_p95": 58.6
+    "val": {
+      "map50": 0.9939,
+      "map50_95": 0.9293,
+      "precision": 0.9994,
+      "recall": 0.9615,
+      "images": 26,
+      "map50_95_ci95": [
+        0.8724,
+        0.9729
+      ]
+    },
+    "test": {
+      "map50": 0.995,
+      "map50_95": 0.8174,
+      "precision": 0.997,
+      "recall": 1.0,
+      "images": 26,
+      "map50_95_ci95": [
+        0.7707,
+        0.8792
+      ]
+    },
+    "latency_ms_mps_p50": 19.8,
+    "latency_ms_mps_p95": 21.6,
+    "latency_ms_cpu_p50": 55.9,
+    "latency_ms_cpu_p95": 57.2
   }
 }

@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 runs/
 *.log
+metrics_*.json
 yolo11*.pt
 
 HANDOFF.md

@@ -11,66 +11,108 @@ Relevant to KYC, cheque, and contract-processing pipelines.
 
 The 178 images are every-2nd-frame grabs from two short videos, so adjacent frames are near-duplicates.
 `make_split.py` cuts each clip into contiguous chunks and holds out whole chunks for val and test (dropping
-the train frames next to them), so no near-copy of a test image sits in train. **Val selects the checkpoint;
-the test split is scored once and never used for selection** (`splits.json`, `metrics_n.json`, `metrics_s.json`).
+the train frames next to them), so no near-copy of a test image sits in train; it also checks by file hash
+that no image appears in two splits (`python make_split.py --check`). **Val selects the checkpoint and the
+training recipe; the test split is scored once and never used for selection.**
 
-| Model | Params | Split | mAP50 | mAP50-95 | Precision | Recall |
+Shipped weights (`weights/`): 100 epochs, batch 8, 640 px, seed 0, trained on one Tesla T4 (torch 2.14.1,
+ultralytics 8.4.191, AMP on) and re-scored on an Apple M2 Pro with `bench.py` (`bench.json`). The 95% interval
+resamples the 26 images (2,000 draws).
+
+| Model | Params | Split | mAP50 | mAP50-95 (95% interval) | Precision | Recall |
 |---|---|---|---|---|---|---|
-| **YOLO11n** | 2.6M | val | 0.995 | 0.973 | 0.998 | 1.000 |
-| **YOLO11n** | 2.6M | **test** | 0.995 | **0.904** | 0.998 | 1.000 |
-| YOLO11s | 9.4M | val | 0.995 | 0.971 | 0.998 | 1.000 |
-| YOLO11s | 9.4M | **test** | 0.995 | **0.905** | 0.997 | 1.000 |
+| **YOLO11n** | 2.6M | val | 0.994 | 0.976 (0.952 to 0.992) | 0.964 | 0.962 |
+| **YOLO11n** | 2.6M | **test** | 0.995 | **0.934** (0.902 to 0.965) | 0.998 | 1.000 |
+| YOLO11s | 9.4M | val | 0.994 | 0.929 (0.872 to 0.973) | 0.999 | 0.962 |
+| YOLO11s | 9.4M | **test** | 0.995 | **0.817** (0.771 to 0.879) | 0.997 | 1.000 |
 
-mAP50 is saturated (0.995) on both splits; the honest generalization signal is mAP50-95, which drops ~7 points
-from val to the held-out test (0.97 → 0.90) — the estimate the earlier val-only setup could not give. The two
-model sizes are within noise of each other on both splits, so `n` is the shipped model
-(`weights/signature_yolo11n.pt`, 60 epochs, 640px, seed 0) at ~1.7x lower CPU latency (15.0 ms vs 19.6 ms MPS,
-34.4 ms vs 57.1 ms CPU; `bench.py`).
+mAP50 is saturated (0.995) on test, so the useful signal is mAP50-95, which drops from val to the held-out test.
+**`n` is the better and the more stable model on this data**; the larger `s` is worse and varies more from seed
+to seed (below). `n` is the shipped model (`weights/signature_yolo11n.pt`) and is also faster on this Mac:
+15.3 ms vs 19.8 ms per image on the GPU (MPS) and 35.2 ms vs 55.9 ms on CPU (p50, `bench.py`). `s` is committed
+so `bench.py` and `robustness.py` run from a fresh clone.
 
-Only the `n` weights are committed; `s` is retrained via `python train.py s`. The split manifest and both
-metrics files are committed, so the table reproduces from `python make_split.py && python train.py n s`.
+### Seeds and training recipe
+
+A single run on 26 test images is noisy, so four recipes were each trained with three seeds per size
+(24 runs, `scripts/modal_grid.py`, all on a T4; raw per-run numbers in `results/grid.json`). The recipe was
+chosen by **mean validation mAP50-95** before looking at test: 100 epochs at batch 8 won for both sizes.
+Mean ± standard deviation over seeds 0, 1, 2:
+
+| Size | Recipe | val mAP50-95 | test mAP50-95 |
+|---|---|---|---|
+| n | 60 epochs, batch 16 (earlier recipe) | 0.957 ± 0.018 | 0.909 ± 0.010 |
+| n | 150 epochs, batch 16 | 0.965 ± 0.013 | 0.909 ± 0.040 |
+| n | **100 epochs, batch 8 (chosen)** | **0.980 ± 0.004** | **0.939 ± 0.005** |
+| n | 100 epochs, batch 8, 800 px | 0.977 ± 0.004 | 0.930 ± 0.027 |
+| s | 60 epochs, batch 16 (earlier recipe) | 0.853 ± 0.074 | 0.799 ± 0.088 |
+| s | 150 epochs, batch 16 | 0.936 ± 0.035 | 0.834 ± 0.036 |
+| s | **100 epochs, batch 8 (chosen)** | **0.945 ± 0.015** | **0.859 ± 0.041** |
+| s | 100 epochs, batch 8, 800 px | 0.880 ± 0.036 | 0.779 ± 0.118 |
+
+The earlier 60-epoch, batch-16 recipe is only about 420 optimizer steps on 110 images; both models sit near
+zero mAP for the first 15 to 30 epochs, and `s` was unstable. The shipped seed-0 weights are not the best seed
+(for `s` the three test scores are 0.817, 0.861 and 0.899), they are the pre-declared seed.
+
+GPU kernels are not bit-exact, so a rerun with seed 0 lands inside the spread above rather than on the same
+digits. Training curves of the shipped weights: `results/train_n.csv`, `results/train_s.csv`.
+
+**History:** the weights committed before 2026-10-28 were trained on the stock Ultralytics split, which
+contains 22 of the 26 test images, so their test score (0.99) was not held out. Earlier versions of this
+README reported 0.904 and 0.905 for `n` and `s`, and a robustness table, from a model that was never committed.
+All numbers here come from the committed weights.
 
 ## Robustness
 
-Each corruption is applied to the 26 held-out **test** images (labels unchanged) and re-scored.
+Each corruption is applied to the 26 held-out **test** images (labels unchanged) and the shipped model is
+re-scored (`robustness.py`, `robustness.json`). Single run; the noise is random and `n` and `s` see different
+noise draws.
 
 ![robustness](robustness.png)
 
-- Detection is robust: mAP50 stays 0.995 under every corruption (one exception: `n` at 0.25x brightness,
-  0.991). The cost shows up in box tightness (mAP50-95), not in finding the signature.
-- **Severe under-exposure is the worst case:** at 0.25x brightness `n` mAP50-95 falls from 0.898 (clean) to
-  **0.585** (`s` to 0.710). Phone photos of documents in poor light are the main risk.
-- Blur, 2–4x downsampling, and JPEG down to q=30 cost ~1 point of mAP50-95; q=10 is harder for `s` (0.724)
-  than `n` (0.864).
-- Heavy sensor noise (sigma=40) hurts box tightness most: `n` mAP50-95 drops to 0.76, and the larger model is
-  *less* robust here (`s` 0.523), so extra capacity did not buy robustness on this dataset.
+mAP50-95 change from the clean score (`n` 0.934, `s` 0.817):
 
-Full numbers: `robustness.json` (test split), `bench.json`; training curves: `runs/`.
+| Corruption | n | s |
+|---|---|---|
+| blur k=5 / k=15 | -0.004 / +0.011 | +0.006 / +0.014 |
+| JPEG q=30 / q=10 | -0.006 / **-0.098** | -0.023 / -0.090 |
+| low-res /2 / /4 | -0.004 / -0.004 | +0.006 / +0.015 |
+| noise s=15 / s=40 | -0.092 / **-0.140** | -0.041 / **-0.237** |
+| dim x0.5 / x0.25 | -0.013 / **-0.519** | -0.061 / -0.355 |
+
+- Blur, 2x and 4x downsampling and JPEG q=30 change mAP50-95 by at most a few points either way; on 26 images
+  differences of that size are noise.
+- **Severe under-exposure is the worst case:** at 0.25x brightness `n` loses half of its mAP50-95 (0.415) and
+  its mAP50 falls to 0.813, so it starts to miss signatures, not just box them loosely. Phone photos of
+  documents in poor light are the main risk.
+- Heavy JPEG compression (q=10) and sensor noise cost `n` 9 to 14 points of box tightness.
+- `s` is not more robust than `n` overall: it is worse on noise s=40 (-0.237) and has a lower clean score.
 
 ## Caveats
 
-The dataset is small (178 images from two videos): 26 test images give a usable but noisy estimate, and mAP50
-is saturated, so read mAP50-95 and the robustness table rather than mAP50. The `clean` mAP50-95 in
-`robustness.json` (`n` 0.898) is a few thousandths off the test row in `metrics_n.json` (0.904) because that
-script re-scores re-encoded copies in a separate run; both were measured. Corruptions are synthetic
-approximations of scan artefacts, rotation is excluded (it would need box re-derivation), and MPS training is
-not bit-for-bit deterministic, so reruns can move mAP50-95 by a few thousandths.
+The dataset is small (178 images from two videos). 26 test images give a usable but noisy estimate, which is
+why the intervals above are wide and why seeds matter. The `clean` row in `robustness.json` re-scores re-encoded
+copies in a separate pass, so it can differ from the test row in `bench.json` by a few thousandths. Corruptions
+are synthetic approximations of scan artefacts, and rotation is excluded (it would need box re-derivation).
+Latency is measured on an Apple M2 Pro and will differ elsewhere.
 
 ## Use
 
 ```bash
 pip install -r requirements.txt
 python detect.py scan.jpg --out annotated.jpg        # prints JSON boxes
-python make_split.py                                   # build the leakage-aware train/val/test split
-python train.py n                                      # retrain (needs the dataset; ultralytics downloads it)
+python make_split.py                                   # build the leakage-aware split (needs the dataset); --check only verifies
+python train.py n s                                    # retrain with the chosen recipe; --device auto|cpu|mps|cuda:0
 python bench.py && python robustness.py n s            # regenerate bench.json / robustness.json (test split)
 python plot_robustness.py                              # redraw robustness.png from robustness.json
 python -m pytest tests
 ```
 
-CI runs lint, a compile check, and the tests. Two tests need the dataset under `~/datasets/signature` and are
-skipped on CI; the smoke tests (`detect()` on the committed `sample.jpg` with the committed `n` weights: box
-structure and confidence-threshold checks) and the missing-file test run everywhere.
+`train.py`, `bench.py` and `robustness.py` pick CUDA, then Apple MPS, then CPU unless `--device` says otherwise.
+CI runs lint, a compile check, and the tests. Tests that need the dataset under `~/datasets/signature` are
+skipped on CI; the smoke tests (`detect()` on the committed `sample.jpg`), the split-manifest check and the
+check that the committed weights were trained on the leakage-aware split with the documented recipe run
+everywhere.
 
 ## License
 
