@@ -1,5 +1,7 @@
-ultralytics>=8.4.174
-opencv-python
-numpy
-pytest
-matplotlib
+# Versions the committed numbers were produced with. torch is not listed so you can install the build for your
+# platform first (tested: torch 2.14.1, torchvision 0.29.1).
+ultralytics==8.4.191
+opencv-python==5.0.0.93
+numpy==2.5.4
+matplotlib==3.11.2
+pytest==9.2.0

@@ -5,13 +5,16 @@ frames are near-duplicates. A random per-image split would put near-copies of te
 each clip is cut into contiguous chunks of CHUNK frames; one chunk per clip goes to test, one to val, the rest
 to train, and the BUFFER train frames next to every held-out chunk are dropped.
 
-    python make_split.py            # writes ~/datasets/signature_split and splits.json
+    python make_split.py            # writes ~/datasets/signature_split and splits.json, then checks it
+    python make_split.py --check    # only check the existing split dir against splits.json
 """
+import hashlib
 import json
 import pathlib
 import random
 import re
 import shutil
+import sys
 
 SEED, CHUNK, BUFFER = 0, 13, 2
 SRC = pathlib.Path.home() / "datasets/signature"
@@ -60,7 +63,35 @@ def make_split():
     return pool, split
 
 
+def check_manifest(manifest):
+    """By name: each image has exactly one role, and every held-out frame is more than BUFFER 2-frame steps from train."""
+    roles = ("train", "val", "test", "dropped")
+    names = [n for r in roles for n in manifest[r]]
+    assert len(names) == len(set(names)), "an image is listed in more than one role"
+    frames = {r: [frame_no(pathlib.Path(n)) for n in manifest[r]] for r in roles}
+    gap = lambda a, b: min(abs(x - y) for x in frames[a] for y in frames[b])
+    assert gap("test", "train") > 2 * BUFFER and gap("val", "train") > 2 * BUFFER, "near-duplicate frame next to train"
+    assert gap("test", "val") > 2 * CHUNK, "val chunk is adjacent to the test chunk"
+
+
+def check_contents(manifest, dst=DST):
+    """By content hash: each split dir holds exactly the manifest's files and no image bytes appear in two splits."""
+    seen = {}
+    for role in ("train", "val", "test"):
+        files = sorted((dst / "images" / role).glob("*"))
+        assert [p.name for p in files] == manifest[role], f"{dst / 'images' / role} differs from splits.json"
+        for p in files:
+            h = hashlib.sha256(p.read_bytes()).hexdigest()
+            assert seen.setdefault(h, role) == role, f"{role}/{p.name} has the same bytes as an image in {seen[h]}"
+
+
 def main():
+    if "--check" in sys.argv:
+        manifest = json.loads((HERE / "splits.json").read_text())
+        check_manifest(manifest)
+        check_contents(manifest)
+        print(manifest["counts"], "split check passed")
+        return
     pool, split = make_split()
     by_role = {r: sorted(n for n, v in split.items() if v == r) for r in ("train", "val", "test", "dropped")}
     # Overlap check: no image in more than one role, and nothing lost or invented.
@@ -82,6 +113,8 @@ def main():
         f"path: {DST}\ntrain: images/train\nval: images/val\ntest: images/test\nnames:\n  0: signature\n")
     manifest = dict(seed=SEED, chunk=CHUNK, buffer=BUFFER, counts={r: len(v) for r, v in by_role.items()}, **by_role)
     (HERE / "splits.json").write_text(json.dumps(manifest, indent=1) + "\n")
+    check_manifest(manifest)
+    check_contents(manifest)
     print(manifest["counts"], "overlap check passed")
 
 

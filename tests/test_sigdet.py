@@ -61,3 +61,32 @@ def test_confidence_threshold_is_respected_on_committed_sample():
 def test_missing_image_raises_clear_error():
     with pytest.raises(FileNotFoundError, match="input image not found"):
         detect(str(ROOT / "does_not_exist.jpg"))
+
+
+def test_split_manifest_has_no_shared_or_adjacent_frames():
+    # Runs on CI: splits.json alone. Also proves the check fails on a leaked manifest.
+    import copy, json
+    from make_split import check_manifest
+    manifest = json.loads((ROOT / "splits.json").read_text())
+    check_manifest(manifest)
+    leaked = copy.deepcopy(manifest)
+    leaked["train"].append(manifest["test"][0])
+    with pytest.raises(AssertionError):
+        check_manifest(leaked)
+
+
+@pytest.mark.skipif(not (pathlib.Path.home() / "datasets/signature_split/images/test").is_dir(), reason="split not built")
+def test_split_dirs_share_no_image_bytes():
+    import json
+    from make_split import check_contents
+    check_contents(json.loads((ROOT / "splits.json").read_text()))
+
+
+def test_committed_weights_were_trained_on_the_leakage_aware_split():
+    # The weights shipped before 2026-10-28 were trained on the stock split, which contains 22 of the 26 test images.
+    from ultralytics import YOLO
+    for w in sorted((ROOT / "weights").glob("*.pt")):
+        args = YOLO(str(w)).ckpt["train_args"]
+        assert args["data"].endswith("signature_split.yaml"), w.name
+        # The documented recipe (see train.py): 100 epochs, batch 8, 640 px, seed 0.
+        assert (args["epochs"], args["batch"], args["imgsz"], args["seed"]) == (100, 8, 640, 0), w.name
