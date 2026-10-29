@@ -1,0 +1,34 @@
+{
+  "split": "val",
+  "metric": "mAP50-95",
+  "model_val": {
+    "n": 0.9756,
+    "n+tta": 0.9695,
+    "s": 0.9293,
+    "s+tta": 0.9459
+  },
+  "predict_pipeline": {
+    "n": 0.9658,
+    "n+tta": 0.9762,
+    "s": 0.9294,
+    "s+tta": 0.9427,
+    "wbf n+s w_n=1 thr=0.55": 0.8931,
+    "wbf n+s w_n=1 thr=0.7": 0.9395,
+    "wbf n+s w_n=2 thr=0.55": 0.9078,
+    "wbf n+s w_n=2 thr=0.7": 0.953,
+    "wbf n+s w_n=3 thr=0.55": 0.9078,
+    "wbf n+s w_n=3 thr=0.7": 0.9554,
+    "wbf n+n_tta w_n=1 thr=0.55": 0.9003,
+    "wbf n+n_tta w_n=1 thr=0.7": 0.969,
+    "wbf n+n_tta w_n=2 thr=0.55": 0.9003,
+    "wbf n+n_tta w_n=2 thr=0.7": 0.969,
+    "wbf n+n_tta w_n=3 thr=0.55": 0.9003,
+    "wbf n+n_tta w_n=3 thr=0.7": 0.969,
+    "wbf n+s+n_tta+s_tta w_n=1 thr=0.55": 0.8597,
+    "wbf n+s+n_tta+s_tta w_n=1 thr=0.7": 0.9401,
+    "wbf n+s+n_tta+s_tta w_n=2 thr=0.55": 0.8735,
+    "wbf n+s+n_tta+s_tta w_n=2 thr=0.7": 0.9469,
+    "wbf n+s+n_tta+s_tta w_n=3 thr=0.55": 0.8743,
+    "wbf n+s+n_tta+s_tta w_n=3 thr=0.7": 0.9585
+  }
+}

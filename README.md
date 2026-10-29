@@ -62,6 +62,25 @@ contains 22 of the 26 test images, so their test score (0.99) was not held out. 
 README reported 0.904 and 0.905 for `n` and `s`, and a robustness table, from a model that was never committed.
 All numbers here come from the committed weights.
 
+### Things tried that did not help
+
+Two cheap inference-time levers were checked on the **validation** split only (`scripts/fusion_probe.py`,
+`results/fusion_probe.json`, shipped seed-0 weights); neither cleared a +0.005 mAP50-95 gain on validation in the
+repo's own evaluator, so the test split was not scored for them and nothing changed in the shipped model.
+
+| Lever (val mAP50-95) | n | s |
+|---|---|---|
+| plain (`model.val`, as in `bench.py`) | 0.976 | 0.929 |
+| ultralytics test-time augmentation (`augment=True`) | 0.970 | 0.946 |
+| weighted boxes fusion of n and s (best of 6 weight / IoU settings) | 0.955 | |
+| weighted boxes fusion of n, s and both TTA outputs (best of 6) | 0.959 | |
+
+- TTA helps `s` (+0.017) but not `n` (-0.006), and `s` with TTA is still below plain `n`. Scored through
+  `model.predict` instead of `model.val` (different letterboxing), TTA moves `n` by +0.010 instead: on 26 images the
+  sign of a 0.01 change depends on preprocessing, so it is noise, not a gain.
+- Fusing `n` with the weaker `s` pulls boxes towards the looser model and lowers mAP50-95 at every setting tried
+  (the fusion rows are scored through `model.predict`, where plain `n` is 0.966).
+
 ## Robustness
 
 Each corruption is applied to the 26 held-out **test** images (labels unchanged) and the shipped model is
