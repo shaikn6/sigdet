@@ -1,9 +1,16 @@
 # sigdet
 
+[![CI](https://github.com/shaikn6/sigdet/actions/workflows/ci.yml/badge.svg)](https://github.com/shaikn6/sigdet/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](.github/workflows/ci.yml)
+
+**A YOLO11 signature detector for scanned documents, scored on a test split with no near-duplicate leakage and
+stress-tested under scan and photo corruptions.**
+
 Document **signature detection** with YOLO11, fine-tuned on the public Ultralytics signature dataset
 with a **leakage-aware train/val/test split** (110 train / 26 val / 26 test; `make_split.py`), plus a
 **robustness study**: how detection quality degrades under realistic scan and photo corruptions.
-Relevant to KYC, cheque, and contract-processing pipelines.
+Relevant to KYC, cheque, and contract-processing pipelines. To run it on your own scan, see [Use](#use).
 
 ![sample](sample.jpg)
 
