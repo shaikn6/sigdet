@@ -1,5 +1,7 @@
 # sigdet
 
+> **Finds signatures in documents with YOLO11 on a leakage-free split, and proves the model survives bad scans.**
+
 [![CI](https://github.com/shaikn6/sigdet/actions/workflows/ci.yml/badge.svg)](https://github.com/shaikn6/sigdet/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](.github/workflows/ci.yml)
