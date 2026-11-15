@@ -6,13 +6,15 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](.github/workflows/ci.yml)
 
-**A YOLO11 signature detector for scanned documents, scored on a test split with no near-duplicate leakage and
-stress-tested under scan and photo corruptions.**
-
-Document **signature detection** with YOLO11, fine-tuned on the public Ultralytics signature dataset
-with a **leakage-aware train/val/test split** (110 train / 26 val / 26 test; `make_split.py`), plus a
-**robustness study**: how detection quality degrades under realistic scan and photo corruptions.
+A YOLO11 signature detector for scanned documents, fine-tuned on the public Ultralytics signature
+dataset with a **leakage-aware train/val/test split** (110 train / 26 val / 26 test; `make_split.py`)
+and a **robustness study** of how detection degrades under realistic scan and photo corruptions.
 Relevant to KYC, cheque, and contract-processing pipelines. To run it on your own scan, see [Use](#use).
+
+**Shipped model (YOLO11n) on the held-out test split:** mAP50-95 **0.934** (95% interval 0.902 to 0.965)
+for the committed seed-0 weights, and **0.939 ± 0.005** across three seeds of the chosen recipe; mAP50 is
+0.995. Reproduce the first number from the committed weights with `python bench.py`, the second from
+`results/grid.json`. Full tables and provenance in [Results](#results).
 
 ![sample](sample.jpg)
 
@@ -116,19 +118,22 @@ mAP50-95 change from the clean score (`n` 0.934, `s` 0.817):
 - Heavy JPEG compression (q=10) and sensor noise cost `n` 9 to 14 points of box tightness.
 - `s` is not more robust than `n` overall: it is worse on noise s=40 (-0.237) and has a lower clean score.
 
-## Caveats
+## Limitations
 
 The dataset is small (178 images from two videos). 26 test images give a usable but noisy estimate, which is
-why the intervals above are wide and why seeds matter. The `clean` row in `robustness.json` re-scores re-encoded
-copies in a separate pass, so it can differ from the test row in `bench.json` by a few thousandths. Corruptions
-are synthetic approximations of scan artefacts, and rotation is excluded (it would need box re-derivation).
-Latency is measured on an Apple M2 Pro and will differ elsewhere.
+why the intervals above are wide and why seeds matter (the per-recipe spread is in [Seeds](#seeds-and-training-recipe)).
+The robustness table is a **single run** per corruption, so differences within a few points are noise. The `clean`
+row in `robustness.json` re-scores re-encoded copies in a separate pass, so it can differ from the test row in
+`bench.json` by a few thousandths. Corruptions are synthetic approximations of scan artefacts, and rotation is
+excluded (it would need box re-derivation). Latency is measured on an Apple M2 Pro and will differ elsewhere.
 
 ## Use
 
 ```bash
 pip install -r requirements.txt
-python detect.py scan.jpg --out annotated.jpg        # prints JSON boxes
+python detect.py scan.jpg --out annotated.jpg        # prints JSON boxes; needs only the committed weights
+# The split/train/bench steps below need the dataset (detect.py does not). Fetch it once to ~/datasets/signature:
+python -c "from ultralytics.utils.downloads import download; from pathlib import Path; download('https://github.com/ultralytics/assets/releases/download/v0.0.0/signature.zip', dir=Path.home()/'datasets')"
 python make_split.py                                   # build the leakage-aware split (needs the dataset); --check only verifies
 python train.py n s                                    # retrain with the chosen recipe; --device auto|cpu|mps|cuda:0
 python bench.py && python robustness.py n s            # regenerate bench.json / robustness.json (test split)
