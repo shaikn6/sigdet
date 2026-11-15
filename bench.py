@@ -24,9 +24,6 @@ def _record(self, stat):
     _update_stats(self, stat)
 
 
-DetMetrics.update_stats = _record
-
-
 def map50_95(stats):
     cat = {k: np.concatenate([s[k] for s in stats]) for k in ("tp", "conf", "pred_cls", "target_cls")}
     return ap_per_class(cat["tp"], cat["conf"], cat["pred_cls"], cat["target_cls"])[5].mean()
@@ -39,30 +36,36 @@ def bootstrap_ci(stats, n=2000):
     return [round(float(v), 4) for v in np.percentile(vals, [2.5, 97.5])]
 
 
-ap = argparse.ArgumentParser()
-ap.add_argument("--device", default="auto")
-device = pick_device(ap.parse_args().device)
+def main():
+    DetMetrics.update_stats = _record  # capture per-image match stats for the bootstrap
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--device", default="auto")
+    device = pick_device(ap.parse_args().device)
 
-imgs = sorted(str(p) for p in (SPLIT / "images/test").glob("*"))
-out = dict(cpu=get_cpu_info(), device=device)
-for size in ["n", "s"]:
-    weights = weights_for(size)
-    model = YOLO(str(weights))
-    row = dict(weights=str(weights.relative_to(HERE)), params_m=round(sum(p.numel() for p in model.model.parameters()) / 1e6, 2))
-    for split in ["val", "test"]:
-        per_image.clear()
-        m = model.val(data=str(SPLIT / "signature_split.yaml"), split=split, device=device, verbose=False, plots=False)
-        row[split] = dict(map50=round(float(m.box.map50), 4), map50_95=round(float(m.box.map), 4),
-                          precision=round(float(m.box.mp), 4), recall=round(float(m.box.mr), 4),
-                          images=len(per_image), map50_95_ci95=bootstrap_ci(per_image))
-    for dev in dict.fromkeys([device, "cpu"]):
-        model.predict(imgs[0], device=dev, verbose=False)
-        ts = []
-        for p in imgs:
-            t = time.perf_counter(); model.predict(p, device=dev, verbose=False, imgsz=640); ts.append((time.perf_counter() - t) * 1e3)
-        name = dev.split(":")[0]
-        row[f"latency_ms_{name}_p50"] = round(float(np.percentile(ts, 50)), 1)
-        row[f"latency_ms_{name}_p95"] = round(float(np.percentile(ts, 95)), 1)
-    out[size] = row
-    print(size, row, flush=True)
-json.dump(out, open("bench.json", "w"), indent=2)
+    imgs = sorted(str(p) for p in (SPLIT / "images/test").glob("*"))
+    out = dict(cpu=get_cpu_info(), device=device)
+    for size in ["n", "s"]:
+        weights = weights_for(size)
+        model = YOLO(str(weights))
+        row = dict(weights=str(weights.relative_to(HERE)), params_m=round(sum(p.numel() for p in model.model.parameters()) / 1e6, 2))
+        for split in ["val", "test"]:
+            per_image.clear()
+            m = model.val(data=str(SPLIT / "signature_split.yaml"), split=split, device=device, verbose=False, plots=False)
+            row[split] = dict(map50=round(float(m.box.map50), 4), map50_95=round(float(m.box.map), 4),
+                              precision=round(float(m.box.mp), 4), recall=round(float(m.box.mr), 4),
+                              images=len(per_image), map50_95_ci95=bootstrap_ci(per_image))
+        for dev in dict.fromkeys([device, "cpu"]):
+            model.predict(imgs[0], device=dev, verbose=False)
+            ts = []
+            for p in imgs:
+                t = time.perf_counter(); model.predict(p, device=dev, verbose=False, imgsz=640); ts.append((time.perf_counter() - t) * 1e3)
+            name = dev.split(":")[0]
+            row[f"latency_ms_{name}_p50"] = round(float(np.percentile(ts, 50)), 1)
+            row[f"latency_ms_{name}_p95"] = round(float(np.percentile(ts, 95)), 1)
+        out[size] = row
+        print(size, row, flush=True)
+    json.dump(out, open("bench.json", "w"), indent=2)
+
+
+if __name__ == "__main__":
+    main()

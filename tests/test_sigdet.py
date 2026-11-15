@@ -90,3 +90,114 @@ def test_committed_weights_were_trained_on_the_leakage_aware_split():
         assert args["data"].endswith("signature_split.yaml"), w.name
         # The documented recipe (see train.py): 100 epochs, batch 8, 640 px, seed 0.
         assert (args["epochs"], args["batch"], args["imgsz"], args["seed"]) == (100, 8, 640, 0), w.name
+
+
+# --- Corruption transforms (robustness.py): synthetic, no model or dataset needed. ---
+
+def _textured_image():
+    import numpy as np
+    rng = np.random.default_rng(0)
+    return rng.integers(0, 256, (32, 48, 3), dtype="uint8")
+
+
+def test_every_corruption_keeps_shape_and_dtype():
+    # Labels are reused unchanged after corruption, so each transform must preserve image geometry and dtype.
+    import robustness
+    im = _textured_image()
+    for name, fn in robustness.CORRUPTIONS.items():
+        out = fn(im)
+        assert out.shape == im.shape and out.dtype == im.dtype, name
+
+
+def test_corruption_keys_match_the_committed_report():
+    # The plot and README table index corruptions by these exact keys.
+    import json
+    import robustness
+    report = json.loads((ROOT / "robustness.json").read_text())
+    assert list(robustness.CORRUPTIONS) == list(report["n"]) == list(report["s"])
+
+
+def test_clean_is_the_identity():
+    import numpy as np
+    import robustness
+    im = _textured_image()
+    assert np.array_equal(robustness.CORRUPTIONS["clean"](im), im)
+
+
+def test_dim_darkens_by_the_stated_factor():
+    import numpy as np
+    import robustness
+    im = np.full((8, 8, 3), 200, dtype="uint8")
+    assert np.array_equal(robustness.dark(im, 0.5), np.full_like(im, 100))
+    assert robustness.dark(im, 0.25).max() < robustness.dark(im, 0.5).max()
+
+
+def test_noise_and_jpeg_stay_in_range_and_change_pixels():
+    import numpy as np
+    import robustness
+    im = _textured_image()
+    noisy = robustness.noise(im, 40)
+    assert noisy.min() >= 0 and noisy.max() <= 255 and not np.array_equal(noisy, im)
+    assert not np.array_equal(robustness.jpeg(im, 10), im)  # heavy compression must alter the texture
+
+
+# --- Metric aggregation (bench.py): synthetic per-image match stats, no model needed. ---
+
+def _stat(hit):
+    import numpy as np
+    return dict(tp=np.full((1, 10), hit, bool), conf=np.array([0.9 if hit else 0.3]),
+                pred_cls=np.array([0.0]), target_cls=np.array([0.0]))
+
+
+def test_map50_95_aggregates_across_images():
+    import bench
+    assert bench.map50_95([_stat(True)] * 5) > 0.9       # all detections correct
+    assert bench.map50_95([_stat(False)] * 5) == 0.0     # none correct
+    mixed = bench.map50_95([_stat(True)] * 7 + [_stat(False)] * 3)
+    assert 0.0 < mixed < 0.9
+
+
+def test_bootstrap_ci_is_ordered_bounded_and_deterministic():
+    import bench
+    mixed = [_stat(True)] * 7 + [_stat(False)] * 3
+    lo, hi = bench.bootstrap_ci(mixed, n=300)
+    assert 0.0 <= lo <= hi <= 1.0
+    assert bench.bootstrap_ci(mixed, n=300) == [lo, hi]  # seeded, so reruns match
+
+
+# --- Leakage-aware split construction (make_split.py): synthetic frame names, no dataset bytes. ---
+
+def test_make_split_reproduces_the_committed_manifest(tmp_path, monkeypatch):
+    import json
+    import make_split
+    manifest = json.loads((ROOT / "splits.json").read_text())
+    roles = ("train", "val", "test", "dropped")
+    (tmp_path / "images/train").mkdir(parents=True)
+    for role in roles:
+        for name in manifest[role]:
+            (tmp_path / "images/train" / name).touch()  # make_split() only globs and parses names
+    monkeypatch.setattr(make_split, "SRC", tmp_path)
+    _, split = make_split.make_split()
+    by_role = {r: sorted(n for n, v in split.items() if v == r) for r in roles}
+    assert by_role == {r: manifest[r] for r in roles}
+
+
+def test_check_manifest_rejects_a_val_chunk_adjacent_to_test():
+    import copy, json
+    from make_split import check_manifest
+    manifest = json.loads((ROOT / "splits.json").read_text())
+    bad = copy.deepcopy(manifest)
+    bad["val"].append(manifest["test"][0])  # a val frame now sits on top of a test frame
+    with pytest.raises(AssertionError):
+        check_manifest(bad)
+
+
+def test_check_contents_flags_identical_bytes_in_two_splits(tmp_path):
+    from make_split import check_contents
+    manifest = {"train": ["Frame_2.jpg"], "val": ["Frame_100.jpg"], "test": ["Frame_200.jpg"]}
+    for role, names in manifest.items():
+        (tmp_path / "images" / role).mkdir(parents=True)
+        for name in names:
+            (tmp_path / "images" / role / name).write_bytes(b"same-bytes")  # train and test collide
+    with pytest.raises(AssertionError, match="same bytes"):
+        check_contents(manifest, dst=tmp_path)

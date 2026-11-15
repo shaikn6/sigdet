@@ -38,19 +38,24 @@ def build(tmp, fn):
     return tmp / "d.yaml"
 
 
-ap = argparse.ArgumentParser()
-ap.add_argument("sizes", nargs="+", choices=["n", "s"])
-ap.add_argument("--device", default="auto")
-a = ap.parse_args()
-device = pick_device(a.device)
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("sizes", nargs="+", choices=["n", "s"])
+    ap.add_argument("--device", default="auto")
+    a = ap.parse_args()
+    device = pick_device(a.device)
 
-out = {}
-for size in a.sizes:
-    model = YOLO(str(weights_for(size)))
-    out[size] = {}
-    for name, fn in CORRUPTIONS.items():
-        with tempfile.TemporaryDirectory() as t:
-            m = model.val(data=str(build(pathlib.Path(t), fn)), device=device, verbose=False, plots=False)
-        out[size][name] = dict(map50=round(float(m.box.map50), 4), map50_95=round(float(m.box.map), 4))
-        print(size, name, out[size][name], flush=True)
-json.dump(out, open("robustness.json", "w"), indent=2)
+    out = {}
+    for size in a.sizes:
+        model = YOLO(str(weights_for(size)))
+        out[size] = {}
+        for name, fn in CORRUPTIONS.items():
+            with tempfile.TemporaryDirectory() as t:
+                m = model.val(data=str(build(pathlib.Path(t), fn)), device=device, verbose=False, plots=False)
+            out[size][name] = dict(map50=round(float(m.box.map50), 4), map50_95=round(float(m.box.map), 4))
+            print(size, name, out[size][name], flush=True)
+    json.dump(out, open("robustness.json", "w"), indent=2)
+
+
+if __name__ == "__main__":
+    main()
